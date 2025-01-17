@@ -9,6 +9,11 @@
     border:blank;
     border-left:white;
 }
+#bur{
+    align:center middle;
+    margin-right:1;
+    margin-left: 1;
+}
 
 .dirs {
     background: $background;

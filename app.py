@@ -96,7 +96,6 @@ class ChocolateEditor(App):
             return
         if not os.path.isdir(file):
             self.open_file(file)
-            # elif file.encode
 
     def open_file(self, file):
         self.text_area.text = open(file).read()
@@ -122,11 +121,11 @@ class ChocolateEditor(App):
             self.refresh(recompose=True)
 
     def build(self):
-        self.ask = Input(placeholder="Type something")
+        self.ask = Input(placeholder="Type something", id='ask')
         self.submit = Button("Submit", id="submit", variant="success")
         self.cancel = Button("Cancel", id="cancel", variant="error")
         self.ask_box = VerticalGroup(
-            self.ask, HorizontalGroup(self.submit, self.cancel)
+            self.ask, HorizontalGroup(self.submit, self.cancel, id='bur'), id="ask-box"
         )
         self.ask_box.add_class("hide")
         self.text_area = TextArea()
