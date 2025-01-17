@@ -3,11 +3,30 @@
 }
 .files {
     width: 25;
+    background: $background;
     text-align: left;
     margin-left: 1;
+    border:blank;
+    border-left:white;
 }
+
 .dirs {
+    background: $background;
+    border:blank;
+    border-left:white;
     width: 25;
     text-align: left;
     margin-left: 1;
+}
+
+#back{
+    width:25;
+}
+
+.hide{
+    display: none;
+}
+
+#search{
+    dock:bottom;
 }
