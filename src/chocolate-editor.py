@@ -1,0 +1,1 @@
+/home/chocolate/Projects/choceditor/chocolate-editor.py
