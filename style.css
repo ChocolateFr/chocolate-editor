@@ -1,7 +1,8 @@
 #vertical_scroll{
     width: 25;
 }
-.files {
+
+.files {    
     width: 25;
     background: $background;
     text-align: left;
@@ -34,4 +35,46 @@
 
 #search{
     dock:bottom;
+}
+
+#text-area {
+    /* border:gray; */
+    background:#24273a; 
+    border:none;
+    scrollbar-size: 1 1;
+    scrollbar-background: #24273a;
+    scrollbar-color:#ed8796;
+}
+
+#foot{
+    color:#ed8796;
+}
+#vertical_scroll{
+    border: gray round;
+}
+.text-area--cursor-line{
+    background: #494d64;
+}
+#ask{
+    border:none;
+    /* padding-top: 1; */
+    height: 1;
+    background: #363a4f;
+}
+#tabs {
+    height: 1;
+    background: #24273a;
+    
+}
+
+.file{    
+    background: #24273a;
+    color:#ed8796;
+    padding-left: 1;
+    padding-right: 1;
+}
+
+.selected{
+    color: #24273a;
+    background: #ed8796;
 }

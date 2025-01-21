@@ -1,1 +1,0 @@
-/home/chocolate/Projects/choceditor/requirements.txt

@@ -1,10 +1,79 @@
-from os.path import abspath, isdir
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, TextArea, Label, Button, Input, Tree
-from textual.containers import HorizontalGroup, VerticalGroup, VerticalScroll
+from textual.widgets import Footer, Header, TextArea, Label, Button, Input, Tree, Select
+from textual.containers import (
+    HorizontalGroup,
+    HorizontalScroll,
+    VerticalGroup,
+    VerticalScroll,
+)
+import re
+from textual.suggester import SuggestFromList
+from textual import events
+import utils
 import os
 import sys
 import shutil
+import watchdict
+
+AUTO_CLOSE = {"[": "[]", "{": "{}", "(": "()", "'": "''", '"': '""'}
+config = watchdict.WatchDict("config.json")
+
+
+class ExtendedTextArea(TextArea):
+
+    """A subclass of TextArea with parenthesis-closing functionality."""
+
+    def _on_key(self, event: events.Key) -> None:
+        
+        if event.character in AUTO_CLOSE:
+            self.insert(AUTO_CLOSE[event.character])
+            self.move_cursor_relative(columns=-1)
+            event.prevent_default()
+
+        elif event.name == 'ctrl_l':
+            app.action_command_line()
+
+        elif event.name == 'enter':
+            s = self.get_cursor_down_location()[0]
+            s = utils.get_required_indentation(self.text,s)
+            self.insert('\n'+s)
+            event.prevent_default()
+        
+        elif event.name == 'ctrl_backspace':
+            self.action_delete_word_left()
+            
+
+            
+        elif event.key == 'tab':
+            self.insert('   ')
+
+        self.auto_complete()
+        
+        
+        
+
+    def get_offset(self):
+        return self.get_cursor_down_location()
+    
+    def auto_complete(self):
+        res = utils.get_comp(self.text, self.get_offset()[0])
+        global suggestions
+        suggestions = res
+        app.refresh(recompose=True)
+
+suggestions = []
+            
+def get_comp(code):
+    comps = utils.get_comp(code)
+    comps = [Label(i) for i in comps]
+    return VerticalScroll(*comps)
+
+class ExtendedInput(Input):
+    def _on_key(self, event: events.Key) -> None:
+        if event.name == "enter":
+            app.submit_value("submit")
+        elif event.name == "escape":
+            app.submit_value("cancel")
 
 
 def remove_path(path: str) -> bool:
@@ -18,16 +87,6 @@ def remove_path(path: str) -> bool:
         return True
     except Exception:
         return False
-
-
-def path_finder(event: Tree.NodeSelected):
-    path = [event.node]
-    while path[-1].parent:
-        path.append(path[-1].parent)
-    path = path[:-1]
-    path.reverse()
-    path = [str(i.label)[2:] for i in path]
-    return "/".join(path)
 
 
 def create_directory_tree(path: str) -> Tree:
@@ -53,95 +112,180 @@ def create_directory_tree(path: str) -> Tree:
 
 class ChocolateEditor(App):
     BINDINGS = [
-        ("d", "toggle_dark", "Toggle dark mode"),
         ("ctrl+s", "save", "Save File"),
-        ("ctrl+l", "left", "Left Side Focus."),
-        ("ctrl+r", "right", "Right Side Focus."),
-        ("ctrl+f", "new_file", "New File."),
-        ("ctrl+n", "new_dir", "New Directory."),
-        ("ctrl+g", "rm", "Remove"),
+        ("ctrl+l", "command_line", "Command Line."),
+        ("ctrl+j", "j", "Left Tab"),
+        ("ctrl+i", "k", "Right Tab"),
+        ("ctrl+r", "r", "Close tab"),
+        ("i", "insert", "Insert Mode"),
+        
     ]
-    stage = "makefile"
+    text_area = ExtendedTextArea(id="text-area", tab_behavior='indent',)
+    cmd_open = False
     path = os.getcwd() if len(sys.argv) == 1 else sys.argv[1]
     path = os.path.abspath(path)
-
+    files_list = []
     CSS_PATH = "style.css"
-    file_name = ""
-    fix_path = lambda self: os.chdir(self.path)
-    search = ""
+    file_index = 0
     action_left = lambda self: self.set_focus(self.files)
     action_right = lambda self: self.set_focus(self.text_area)
+    tabs = HorizontalScroll(id="tabs")
 
-    def action_new_dir(self):
-        self.stage = "makedir"
-        self.text_area.add_class("hide")
-        self.ask_box.remove_class("hide")
+    def action_r(self):
+        self.files_list.pop(self.file_index)
+        self.file_index = 0
+        self.action_j()
+        self.refresh(recompose=True)
 
-    def action_rm(self):
-        self.stage = "rm"
-        self.text_area.add_class("hide")
-        self.ask_box.remove_class("hide")
+    def action_insert(self):
+        self.set_focus(self.text_area)
 
-    def action_new_file(self):
-        self.stage = "makefile"
-        self.text_area.add_class("hide")
-        self.ask_box.remove_class("hide")
-
-    def on_tree_node_selected(self, event: Tree.NodeSelected):
-        file = path_finder(event)
-
-        if not file:
+    def action_j(self):
+        if len(self.files_list) == 0:
+            self.text_area.text = ''
             return
-        if not os.path.isdir(file):
-            self.open_file(file)
+        if self.file_index == 0:
+            self.file_index = len(self.files_list) - 1
+        else:
+            self.file_index -= 1
+        self.open_file(self.files_list[self.file_index])
+
+    def action_k(self):
+        if len(self.files_list) == 0:
+            self.text_area.text = ''
+            return
+        if self.file_index >= len(self.files_list) - 1:
+            self.file_index = 0
+        else:
+            self.file_index += 1
+        self.open_file(self.files_list[self.file_index])
+
+    def action_command_line(self):
+        if not self.cmd_open:
+            self.ask_box.remove_class("hide")
+            self.set_focus(self.ask)
+            self.cmd_open = True
+        else:
+            
+            self.ask_box.add_class("hide")
+            self.cmd_open = False
 
     def open_file(self, file):
-        self.text_area.text = open(file).read()
-        self.file_name = file
-        self.text_area.show_line_numbers = True
-        self.text_area.refresh(recompose=True)
+        if not os.path.exists(file):
+            self.notify("ERROR: this file does not exists.", severity='error')
+            return
+        if file not in self.files_list:
+            self.files_list.append(file)
+            self.file_index = len(self.files_list) - 1
 
-        if file.endswith(".py") or file.endswith(".pyw"):
-            self.text_area.language = "python"
+        try:
+            self.files_list
+            with open(file) as f:
+                content = f.read()
+            self.text_area.load_text(content)  # Load text into TextArea
+            self.file_name = file
 
-    def on_button_pressed(self, event: Button.Pressed):
-        result = self.ask.value.strip()
-        if event.button.id == "submit" and result:
-            if self.stage == "makefile":
-                open(result, "+w").close()
-                self.open_file(result)
-            elif self.stage == "makedir":
-                os.mkdir(result)
-            elif self.stage == "rm":
-                remove_path(result)
-            self.ask_box.add_class("hide")
-            self.text_area.remove_class("hide")
+            # Update appearance and focus
+            self.text_area.show_line_numbers = True
+            self.set_focus(self.text_area)
             self.refresh(recompose=True)
 
-    def build(self):
-        self.ask = Input(placeholder="Type something", id='ask')
-        self.submit = Button("Submit", id="submit", variant="success")
-        self.cancel = Button("Cancel", id="cancel", variant="error")
-        self.ask_box = VerticalGroup(
-            self.ask, HorizontalGroup(self.submit, self.cancel, id='bur'), id="ask-box"
-        )
+          # Set syntax highlighting based on file type
+            if file.endswith(".py") or file.endswith(".pyw"):
+                self.text_area.language = "python"
+            elif file.endswith(".lua"):
+                self.text_area.language = "lua"
+            elif file.endswith(".css"):
+                self.text_area.language = "css"
+            elif file.endswith(".html"):
+                self.text_area.language = "html"
+            elif file.endswith(".js"):
+                self.text_area.language = "javascript"
+            elif file.endswith(".ts"):
+                self.text_area.language = "typescript"
+            elif file.endswith(".java"):
+                self.text_area.language = "java"
+            elif file.endswith(".c"):
+                self.text_area.language = "c"
+            elif file.endswith(".cpp"):
+                self.text_area.language = "cpp"
+            elif file.endswith(".h"):
+                self.text_area.language = "cpp"  # Assuming header files are C/C++-related
+            elif file.endswith(".json"):
+                self.text_area.language = "json"
+            elif file.endswith(".xml"):
+                self.text_area.language = "xml"
+            elif file.endswith(".yaml") or file.endswith(".yml"):
+                self.text_area.language = "yaml"
+            elif file.endswith(".go"):
+                self.text_area.language = "go"
+            elif file.endswith(".ruby"):
+                self.text_area.language = "ruby"
+            elif file.endswith(".php"):
+                self.text_area.language = "php"
+            elif file.endswith(".sql"):
+                self.text_area.language = "sql"
+            elif file.endswith(".bash"):
+                self.text_area.language = "bash"
+            elif file.endswith(".sh"):
+                self.text_area.language = "bash"
+            elif file.endswith(".swift"):
+                self.text_area.language = "swift"
+            else:
+                self.text_area.language = None
+
+
+            
+
+        except Exception as e:
+            self.notify(f"Error opening file: {e}", severity="error")
+
+    def submit_value(self, event):
+        result = self.ask.value.strip()
+        if event == "submit" and result:
+            if result.startswith("."):
+                result = result.split(" ", 1)
+                if result[0] == ".n":
+                    open(result[1], "+w").close()
+                    self.open_file(result[1])
+                    self.set_focus(self.text_area)
+                elif result[0] == ".r":
+                    remove_path(result[1])
+
+                elif result[0] == ".o":
+                    self.open_file(result[1])
+
         self.ask_box.add_class("hide")
-        self.text_area = TextArea()
-        self.files = VerticalScroll(
-            create_directory_tree(self.path), id="vertical_scroll"
+        self.refresh(recompose=True)
+
+    def build(self):
+        self.ask = ExtendedInput(
+            placeholder="Type something",
+            id="ask",
+            suggester=SuggestFromList(utils.prefixer([".w", ".o", ".r", ".m"])),
         )
-        return HorizontalGroup(self.files, self.text_area, self.ask_box)
+        self.ask_box = self.ask
+        self.ask_box.add_class("hide")
+        tabs = []
+        for i in self.files_list:
+            l = Label(i)
+            l.add_class("file")
+            tabs.append(l)
+
+        if len(tabs):
+            tabs[self.file_index].add_class("selected")
+        self.tabs._add_children(*tabs)
+        return VerticalGroup(self.tabs, self.text_area, self.ask_box)
 
     def compose(self) -> ComposeResult:
-        self.fix_path()
-        yield Header()
+        yield Header(True,icon=' ')
         yield self.build()
-        yield Footer()
-
-    def action_toggle_dark(self) -> None:
-        self.theme = (
-            "textual-dark" if self.theme == "textual-light" else "textual-light"
-        )
+        if len(suggestions):
+            yield VerticalScroll(
+                *[Label(i) for i in suggestions]
+            )
+        
+        
 
     def action_save(self):
         try:
@@ -150,7 +294,6 @@ class ChocolateEditor(App):
             self.notify("File saved.")
         except Exception as err:
             self.notify(str(err), severity="error")
-        
 
 
 if __name__ == "__main__":
