@@ -1,7 +1,3 @@
-#vertical_scroll{
-    width: 25;
-}
-
 .files {    
     width: 25;
     background: $background;
@@ -10,31 +6,9 @@
     border:blank;
     border-left:white;
 }
-#bur{
-    align:center middle;
-    margin-right:1;
-    margin-left: 1;
-}
-
-.dirs {
-    background: $background;
-    border:blank;
-    border-left:white;
-    width: 25;
-    text-align: left;
-    margin-left: 1;
-}
-
-#back{
-    width:25;
-}
 
 .hide{
     display: none;
-}
-
-#search{
-    dock:bottom;
 }
 
 #text-area {
@@ -66,14 +40,12 @@
     background: #24273a;
     
 }
-
 .file{    
     background: #24273a;
     color:#ed8796;
     padding-left: 1;
     padding-right: 1;
 }
-
 .selected{
     color: #24273a;
     background: #ed8796;
